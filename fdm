@@ -1,0 +1,97 @@
+#!/bin/bash
+
+set -eu
+
+VENDOR_FILE="Vendors"
+VENDOR_PATH="$(pwd)/_vendor"
+VENDOR_SRC="$VENDOR_PATH/src"
+
+if [[ ! -r "$VENDOR_FILE" ]]; then
+  echo "Vendors file must exist"
+  exit 1
+fi
+
+vendor_gopath() {
+    export REAL_GOPATH="$GOPATH"
+    export GOPATH="$VENDOR_PATH"
+}
+
+restore_gopath() {
+    export GOPATH="$REAL_GOPATH"
+    export REAL_GOPATH=""
+}
+
+vendor_clone() {
+  orig_vendor="$1"; shift
+  alias_vendor="$1"; shift
+  args="$@"
+
+  orig_path="$VENDOR_SRC/$orig_vendor"
+
+  test -d "$orig_path/.git" || git clone "https://$orig_vendor" "$orig_path/" $args
+
+  if [[ "$alias_vendor" != "" ]]; then
+    #alias_path="$(dirname $VENDOR_SRC/$alias_vendor)"
+    alias_path="$VENDOR_SRC/$alias_vendor"
+    #mkdir -p "$alias_path"
+    mkdir -p "$(dirname $VENDOR_SRC/$alias_vendor)"
+    test -d "$VENDOR_SRC/$alias_vendor" || ln -s "$orig_path" "$alias_path"
+  fi
+}
+
+vendor_build() {
+  orig_vendor="$1"; shift
+  alias_vendor="$1"; shift
+  args="$@"
+
+  orig_path="$VENDOR_SRC/$orig_vendor"
+  (cd "$orig_path" && go install $args)
+}
+
+vendor() {
+  orig_vendor="$1"; shift
+  alias_vendor="$1"; shift
+  args="$@"
+
+  vendor_clone "$orig_vendor" "$alias_vendor" "$args"
+  vendor_build "$orig_vendor" "$alias_vendor"
+}
+
+unforked_vendor() {
+  orig="$1"; shift
+  args="$@"
+
+  vendor "$orig" "" "$args"
+}
+
+unforked_vendor_clone() {
+  orig="$1"; shift
+  args="$@"
+
+  vendor_clone "$orig" "" "$args"
+}
+
+unforked_vendor_build() {
+  orig="$1"; shift
+  args="$@"
+
+  vendor_build "$orig" "" "$args"
+}
+
+install_vendors() {
+  source "$VENDOR_FILE"
+  #github_rewrite
+}
+
+main() {
+  mkdir -p "$VENDOR_PATH"
+
+  vendor_gopath
+  if [[ "$#" -eq "0" ]]; then
+    install_vendors
+  else
+    go $@
+  fi
+  restore_gopath
+}
+main "$@"
