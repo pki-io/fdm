@@ -85,3 +85,16 @@ Only builds, ARGS is passed to go install.
 
 Because the Vendors file is just bash, we can do clever things like group based on environment variable. In the above example, if fdm was called with FDM\_ENV set to DEV, then it would skip the unforked\_vendor\_build code loop.
 
+## Calling fdm
+
+Running the fdm command without any arguments tells fdm to process the Vendors file.
+
+If you pass any arguements, fdm will rewrite GOPATH as required and will run go with the supplied arguments.
+
+For example, you might run the following:
+
+    # Process the Vendors, installing all dependencies...
+    $ fdm
+
+    # Run the go tests
+    $ fdm test
