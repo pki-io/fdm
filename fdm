@@ -13,7 +13,7 @@ fi
 
 vendor_gopath() {
     export REAL_GOPATH="$GOPATH"
-    export GOPATH="$VENDOR_PATH"
+    export GOPATH="$VENDOR_PATH:$GOPATH"
 }
 
 restore_gopath() {
