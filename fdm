@@ -89,6 +89,9 @@ main() {
   vendor_gopath
   if [[ "$#" -eq "0" ]]; then
     install_vendors
+  elif [[ "$0" == "exec" ]]; then
+    shift;
+    $@
   else
     go $@
   fi
