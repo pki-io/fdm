@@ -89,7 +89,9 @@ Because the Vendors file is just bash, we can do clever things like group based 
 
 Running the fdm command without any arguments tells fdm to process the Vendors file.
 
-If you pass any arguements, fdm will rewrite GOPATH as required and will run go with the supplied arguments.
+If the first argument is exec, fdm will rewrite the GOPATH then call the remaining args.
+
+If you pass any other arguements, fdm will rewrite GOPATH as required will run go with the supplied arguments.
 
 For example, you might run the following:
 
@@ -98,3 +100,6 @@ For example, you might run the following:
 
     # Run the go tests
     $ fdm test
+    
+    # Run something else with the correct GOPATH
+    $ fdm exec gover
