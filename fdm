@@ -28,7 +28,10 @@ vendor_clone() {
 
   orig_path="$VENDOR_SRC/$orig_vendor"
 
-  test -d "$orig_path/.git" || git clone "https://$orig_vendor" "$orig_path/" $args
+  test -d "$orig_path/.git" || git clone "https://$orig_vendor" "$orig_path/"
+  if [[ "${#args}" -gt 0 ]]; then
+    (cd "$orig_path" && git $args)
+  fi
 
   if [[ "$alias_vendor" != "" ]]; then
     #alias_path="$(dirname $VENDOR_SRC/$alias_vendor)"
