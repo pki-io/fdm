@@ -2,102 +2,185 @@
 
 set -eu
 
-VENDOR_FILE="Vendors"
-VENDOR_PATH="$(pwd)/_vendor"
-VENDOR_SRC="$VENDOR_PATH/src"
+export VENDOR_FILE="Vendors"
+export VENDOR_PATH="$(pwd)/_vendor"
+export VENDOR_SRC="$VENDOR_PATH/src"
+export DEBUG="false"
+export DEVMODE="false"
 
 if [[ ! -r "$VENDOR_FILE" ]]; then
   echo "Vendors file must exist"
   exit 1
 fi
 
+usage() {
+  echo "Usage: fdm [--help] [--debug] [--dev] [--exec COMMAND] [GO_ARGS]"
+  echo
+  echo "If no arguments are given, fdm loads the Vendors file"
+  echo "Options:"
+  echo "    --help              This help"
+  echo "    --debug             Print debug info"
+  echo "    --dev               Enable dev mode. Use this to ignore the --git switch and use master"
+  echo "    --exec COMMAND      Execute COMMAND with modified GOPATH"
+  echo "    GO_ARGS             Any other arguments passed to go with modified GOPATH"
+  echo
+  echo "Vendors file"
+  echo "------------"
+  echo
+  echo "The vendors file is just a bash script, but fdm provides the 'vendor' function which works as follows:"
+  echo
+  echo "vendor --repo REPO [--clone|--build] [--fork REPO] [--git COMMAND] [--pkg PACKAGE]"
+  echo 
+  echo "Options:"
+  echo "    -r, --repo REPO     Repository or upstream. E.g. github.com/them/their-project or github.com/you/your-project"
+  echo "    -c, --clone         Only perform clone actio"
+  echo "    -b, --build         Only perform build action"
+  echo "    -f, --fork REPO     Fork (vendored) repository E.g. github.com/you/their-project"
+  echo "    -g, --git COMMAND   Git command to run after clone. E.g. 'checkout 5c68cfdf2a545b5ff576c075b459d1fc0c606f82'"
+  echo "    -p, --pkg PACKAGE   Package to build if repo contains multiple packages"
+  echo "    --force             Force git command even in dev mode"
+  exit 1
+}
+
+debug() {
+  if [ "$DEBUG" == "true" ]; then
+    echo -e "DEBUG $1"
+  fi
+}
+
 vendor_gopath() {
     export REAL_GOPATH="$GOPATH"
     export GOPATH="$VENDOR_PATH:$GOPATH"
+    debug "(vendor_gopath) GOPATH set to $GOPATH"
 }
 
 restore_gopath() {
     export GOPATH="$REAL_GOPATH"
     export REAL_GOPATH=""
+    debug "(restore_gopath) GOPATH restored to $GOPATH"
 }
 
 vendor_clone() {
-  orig_vendor="$1"; shift
-  alias_vendor="$1"; shift
-  args="$@"
+  fork="$1"; shift
+  repo="$1"; shift
+  git="$1"; shift
+  pkg="$1"; shift
+  force="$1"; shift
 
-  orig_path="$VENDOR_SRC/$orig_vendor"
 
-  test -d "$orig_path/.git" || git clone "https://$orig_vendor" "$orig_path/"
-  if [[ "${#args}" -gt 0 ]]; then
-    (cd "$orig_path" && git $args)
+  if [ -n "$fork" ]; then
+    repo_to_use="$fork"
+  else
+    repo_to_use="$repo"
   fi
 
-  if [[ "$alias_vendor" != "" ]]; then
+  repo_path="$VENDOR_SRC/$repo_to_use"
+
+  if [ -d "$repo_path/.git" ]; then
+    debug "(vendor_clone) path $repo_path/.git already exists, not cloning"
+  else
+    debug "(vendor_clone) cloning $repo_to_use into $repo_path"
+    git clone "https://$repo_to_use" "$repo_path/"
+  fi
+
+  if [ -n "$git" ] && ([ "$DEVMODE" == "false" ] || [ "$force" == "true" ]); then
+    debug "(vendor_clone) running git $git inside $repo_path"
+    (cd "$repo_path" && git $git)
+  fi
+
+  if [ -n "$fork" ]; then
     #alias_path="$(dirname $VENDOR_SRC/$alias_vendor)"
-    alias_path="$VENDOR_SRC/$alias_vendor"
+    alias_path="$VENDOR_SRC/$repo"
     #mkdir -p "$alias_path"
-    mkdir -p "$(dirname $VENDOR_SRC/$alias_vendor)"
-    test -d "$VENDOR_SRC/$alias_vendor" || ln -s "$orig_path" "$alias_path"
+    debug "(vendor_clone) creating alias path $alias_path"
+    mkdir -p "$(dirname $alias_path)"
+    debug "(vendor_clone) creating symlink from $repo_path to $alias_path"
+    test -d "$VENDOR_SRC/$repo" || ln -s "$repo_path" "$alias_path"
   fi
 }
 
 vendor_build() {
-  orig_vendor="$1"; shift
-  alias_vendor="$1"; shift
-  args="$@"
+  fork="$1"; shift
+  repo="$1"; shift
+  git="$1"; shift
+  pkg="$1"; shift
+  force="$1"; shift
 
-  orig_path="$VENDOR_SRC/$orig_vendor"
-  (cd "$orig_path" && go install $args)
+  repo_path="$VENDOR_SRC/$repo/$pkg"
+  debug "(vendor_build) running 'go install' in $repo_path"
+  (cd "$repo_path" && go install )
+}
+
+vendor_clone_and_build() {
+  fork="$1"; shift
+  repo="$1"; shift
+  git="$1"; shift
+  pkg="$1"; shift
+  force="$1"; shift
+
+  vendor_clone "$fork" "$repo" "$git" "$pkg" "$force"
+  vendor_build "$fork" "$repo" "$git" "$pkg" "$force"
 }
 
 vendor() {
-  orig_vendor="$1"; shift
-  alias_vendor="$1"; shift
-  args="$@"
+  action="clone-and-build"
+  repo=""
+  fork=""
+  git=""
+  pkg=""
+  force="false"
 
-  vendor_clone "$orig_vendor" "$alias_vendor" "$args"
-  vendor_build "$orig_vendor" "$alias_vendor"
-}
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --clone|-c)   action="clone";;
+      --build|-b)   action="build";;
+      --repo|-r)    shift; repo="$1"; continue;;
+      --fork|-f)    shift; fork="$1"; continue;;
+      --git|-g)     shift; git="$1"; continue;;
+      --pkg|-p)     shift; pkg="$1"; continue;;
+      --force)      force="true"; continue;;
+      --)           shift; break;;
+    esac
+    shift
+  done
 
-unforked_vendor() {
-  orig="$1"; shift
-  args="$@"
-
-  vendor "$orig" "" "$args"
-}
-
-unforked_vendor_clone() {
-  orig="$1"; shift
-  args="$@"
-
-  vendor_clone "$orig" "" "$args"
-}
-
-unforked_vendor_build() {
-  orig="$1"; shift
-  args="$@"
-
-  vendor_build "$orig" "" "$args"
+  case "$action" in
+    "clone-and-build") vendor_clone_and_build "$fork" "$repo" "$git" "$pkg" "$force";;
+    "clone")           vendor_clone "$fork" "$repo" "$git" "$pkg" "$force";;
+    "build")           vendor_build "$fork" "$repo" "$git" "$pkg" "$force";;
+  esac
 }
 
 install_vendors() {
   source "$VENDOR_FILE"
-  #github_rewrite
 }
 
 main() {
   mkdir -p "$VENDOR_PATH"
 
-  vendor_gopath
-  if [[ "$#" -eq "0" ]]; then
-    install_vendors
-  elif [[ "$1" == "exec" ]]; then
-    shift;
-    $@
-  else
-    go $@
+  action=""
+  if [ "$#" -eq "0" ]; then
+    action="install"
   fi
+
+  while [ "$#" -gt "0" ]; do
+    case "$1" in
+      --dev)          export DEVMODE="true"; action="install";;
+      --exec)         action="exec";;
+      --help|-h|help) usage; break;;
+      --debug) export DEBUG="true";;
+      *)              action="go"; break;;
+    esac
+    shift
+  done
+
+  debug "(main) args: $@"
+  vendor_gopath
+  case "$action" in
+    "install") install_vendors;;
+    "exec") $@;;
+    "go") go $@;;
+  esac
   restore_gopath
 }
 main "$@"
