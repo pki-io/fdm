@@ -138,7 +138,7 @@ vendor() {
       --fork|-f)    shift; fork="$1"; continue;;
       --git|-g)     shift; git="$1"; continue;;
       --pkg|-p)     shift; pkg="$1"; continue;;
-      --force)      force="true"; continue;;
+      --force)      shift; force="true"; continue;;
       --)           shift; break;;
     esac
     shift
