@@ -166,7 +166,7 @@ main() {
   while [ "$#" -gt "0" ]; do
     case "$1" in
       --dev)          export DEVMODE="true"; action="install";;
-      --exec)         action="exec";;
+      --exec)         shift; action="exec"; break;;
       --help|-h|help) usage; break;;
       --debug) export DEBUG="true";;
       *)              action="go"; break;;
