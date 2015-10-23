@@ -7,6 +7,7 @@ export VENDOR_PATH="$(pwd)/_vendor"
 export VENDOR_SRC="$VENDOR_PATH/src"
 export DEBUG="false"
 export DEVMODE="false"
+export GOPATH=${GOPATH:-}
 
 if [[ ! -r "$VENDOR_FILE" ]]; then
   echo "Vendors file must exist"
